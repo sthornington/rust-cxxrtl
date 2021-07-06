@@ -1,9 +1,10 @@
 use cxxrtl_sys::cxxrtl;
 use std::path::{Path, PathBuf};
-use std::ffi::CString;
+use std::fs::File;
 use std::process::Command;
-use std::env;
+use std::{env, ptr, slice};
 use c_str_macro::c_str;
+use std::io::prelude::*;
 
 pub fn build(sources: &[PathBuf], dest: &Path) {
     let output = Command::new("yosys-config")
@@ -43,6 +44,7 @@ fn main() {
         let vcd = sim.cxxrtl_vcd_create();
         sim.cxxrtl_vcd_timescale(vcd, 10, c_str!("ns").as_ptr());
         sim.cxxrtl_vcd_add_from(vcd, blink);
+        let mut trace_file = File::create("trace.vcd").expect("unable to open trace file");
 
         let clk = sim.cxxrtl_get(blink, c_str!("clk").as_ptr());
         let led = sim.cxxrtl_get(blink, c_str!("led").as_ptr());
@@ -65,10 +67,10 @@ fn main() {
             }
             {
                 let mut len = 0;
-                let mut buf = ::std::ptr::null();
+                let mut buf = ptr::null();
                 sim.cxxrtl_vcd_read(vcd, &mut buf, &mut len);
-                // TODO convert this buffer and length into a slice and
-                // dump it to a file
+                let data = slice::from_raw_parts(buf as *const u8, len as usize);
+                trace_file.write_all(data);
             }
         }
     }
